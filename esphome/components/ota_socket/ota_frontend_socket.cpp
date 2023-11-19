@@ -21,6 +21,8 @@ OTAFrontendSocket::OTAFrontendSocket() {}
 
 void OTAFrontendSocket::set_port(uint16_t port) { this->port_ = port; }
 
+float OTAFrontendSocket::get_setup_priority() const { return setup_priority::AFTER_WIFI; }
+
 void OTAFrontendSocket::setup() {
   server_ = socket::socket_ip(SOCK_STREAM, 0);
   if (server_ == nullptr) {
