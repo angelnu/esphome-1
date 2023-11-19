@@ -67,10 +67,10 @@ void OTAComponent::loop() {
   }
 }
 
-void OTAComponent::do_OTA_session(OTAFrontend *frontend) {
-  if (this->activeFrontend_ != nullptr) {
+void OTAComponent::do_ota_session(OTAFrontend *frontend) {
+  if (this->active_frontend_ != nullptr) {
   } else {
-    activeFrontend_ = frontend;
+    active_frontend_ = frontend;
   }
 
   this->handle_();
@@ -240,16 +240,16 @@ void OTAComponent::handle_() {
         case OTA_COMMAND_REBOOT:
           buf[0] = OTA_RESPONSE_OK;
           this->writeall_(buf, 1);
-          this->activeFrontend_->closeSession();
-          this->activeFrontend_ = nullptr;
+          this->active_frontend_->close_session();
+          this->active_frontend_ = nullptr;
           delay(100);  // NOLINT
           App.safe_reboot();
           return;  // Will never be reached
         case OTA_COMMAND_END:
           ESP_LOGI(TAG, "OTA session finished!");
           // close connection
-          this->activeFrontend_->closeSession();
-          this->activeFrontend_ = nullptr;
+          this->active_frontend_->close_session();
+          this->active_frontend_ = nullptr;
           return;
         case OTA_COMMAND_READ:
           error_code = this->get_partition_info_(buf, bin_type, ota_size);
@@ -286,8 +286,8 @@ void OTAComponent::handle_() {
     this->readall_(buf, 1);
 
     // close connection and reboot
-    this->activeFrontend_->closeSession();
-    this->activeFrontend_ = nullptr;
+    this->active_frontend_->close_session();
+    this->active_frontend_ = nullptr;
     delay(100);  // NOLINT
     App.safe_reboot();
     return;  // Will never be reached
@@ -313,7 +313,7 @@ bool OTAComponent::readall_(uint8_t *buf, size_t len) {
       return false;
     }
 
-    ssize_t read = this->activeFrontend_->read(buf + at, len - at);
+    ssize_t read = this->active_frontend_->read(buf + at, len - at);
     if (read == -1) {
       if (errno == EAGAIN || errno == EWOULDBLOCK) {
         App.feed_wdt();
@@ -344,7 +344,7 @@ bool OTAComponent::writeall_(const uint8_t *buf, size_t len) {
       return false;
     }
 
-    ssize_t written = this->activeFrontend_->write(buf + at, len - at);
+    ssize_t written = this->active_frontend_->write(buf + at, len - at);
     if (written == -1) {
       if (errno == EAGAIN || errno == EWOULDBLOCK) {
         App.feed_wdt();
@@ -431,7 +431,7 @@ OTAResponseTypes OTAComponent::write_flash_(uint8_t *buf, std::unique_ptr<OTABac
   while (total < ota_size) {
     // TODO: timeout check
     size_t requested = std::min(sizeof(buf), ota_size - total);
-    ssize_t read = this->activeFrontend_->read(buf, requested);
+    ssize_t read = this->active_frontend_->read(buf, requested);
     if (read == -1) {
       if (errno == EAGAIN || errno == EWOULDBLOCK) {
         App.feed_wdt();

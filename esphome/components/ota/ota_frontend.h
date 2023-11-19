@@ -8,7 +8,7 @@ class OTAFrontend {
   virtual ~OTAFrontend() = default;
   virtual ssize_t read(uint8_t *buf, size_t len);
   virtual ssize_t write(const uint8_t *buf, size_t len);
-  virtual void closeSession();
+  virtual void close_session();
 };
 
 }  // namespace ota

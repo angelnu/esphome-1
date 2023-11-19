@@ -1,10 +1,9 @@
 #pragma once
 
-#include "esphome/core/defines.h"
 #include "esphome/core/component.h"
-#include "esphome/core/preferences.h"
-#include "esphome/core/helpers.h"
 #include "esphome/core/defines.h"
+#include "esphome/core/helpers.h"
+#include "esphome/core/preferences.h"
 #include "ota_backend.h"
 #include "ota_frontend.h"
 
@@ -51,7 +50,7 @@ class OTAComponent : public Component {
 
   // Starts an OTA session using passed frontend to send/receive bytes
   // Only one session can be done at the same time
-  void do_OTA_session(OTAFrontend *frontend);
+  void do_ota_session(OTAFrontend *frontend);
 
   // ========== INTERNAL METHODS ==========
   // (In most use cases you won't need these)
@@ -81,7 +80,7 @@ class OTAComponent : public Component {
   std::string password_;
 #endif  // USE_OTA_PASSWORD
 
-  OTAFrontend *activeFrontend_{nullptr};
+  OTAFrontend *active_frontend_{nullptr};
 
   bool has_safe_mode_{false};              ///< stores whether safe mode can be enabled.
   uint32_t safe_mode_start_time_;          ///< stores when safe mode was enabled.
