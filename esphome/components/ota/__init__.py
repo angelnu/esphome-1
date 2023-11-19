@@ -6,7 +6,6 @@ from esphome.const import (
     CONF_ID,
     CONF_NUM_ATTEMPTS,
     CONF_PASSWORD,
-    CONF_PORT,
     CONF_REBOOT_TIMEOUT,
     CONF_SAFE_MODE,
     CONF_TRIGGER_ID,
@@ -16,8 +15,7 @@ from esphome.const import (
 from esphome.core import CORE, coroutine_with_priority
 
 CODEOWNERS = ["@esphome/core"]
-DEPENDENCIES = ["network"]
-AUTO_LOAD = ["socket", "md5"]
+AUTO_LOAD = ["md5"]
 
 CONF_UNPROTECTED_WRITES = "unprotected_writes"
 CONF_ON_STATE_CHANGE = "on_state_change"
@@ -51,14 +49,6 @@ CONFIG_SCHEMA = cv.All(
             cv.GenerateID(): cv.declare_id(OTAComponent),
             cv.Optional(CONF_SAFE_MODE, default=False): cv.boolean,
             cv.Optional(CONF_UNPROTECTED_WRITES, default=False): cv.boolean,
-            cv.SplitDefault(
-                CONF_PORT,
-                esp8266=8266,
-                esp32=3232,
-                rp2040=2040,
-                bk72xx=8892,
-                rtl87xx=8892,
-            ): cv.port,
             cv.Optional(CONF_PASSWORD): cv.string,
             cv.Optional(
                 CONF_REBOOT_TIMEOUT, default="5min"
@@ -102,7 +92,6 @@ async def to_code(config):
     CORE.data[CONF_OTA] = {}
 
     var = cg.new_Pvariable(config[CONF_ID])
-    cg.add(var.set_port(config[CONF_PORT]))
     cg.add_define("USE_OTA")
     if CONF_PASSWORD in config:
         cg.add(var.set_auth_password(config[CONF_PASSWORD]))

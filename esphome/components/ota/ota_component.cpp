@@ -10,7 +10,6 @@
 #include "esphome/core/hal.h"
 #include "esphome/core/util.h"
 #include "esphome/components/md5/md5.h"
-#include "esphome/components/network/util.h"
 
 #include <cerrno>
 #include <cstdio>
@@ -43,55 +42,10 @@ std::unique_ptr<OTABackend> make_ota_backend() {
 
 OTAComponent::OTAComponent() { global_ota_component = this; }
 
-void OTAComponent::setup() {
-  server_ = socket::socket_ip(SOCK_STREAM, 0);
-  if (server_ == nullptr) {
-    ESP_LOGW(TAG, "Could not create socket.");
-    this->mark_failed();
-    return;
-  }
-  int enable = 1;
-  int err = server_->setsockopt(SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int));
-  if (err != 0) {
-    ESP_LOGW(TAG, "Socket unable to set reuseaddr: errno %d", err);
-    // we can still continue
-  }
-  err = server_->setblocking(false);
-  if (err != 0) {
-    ESP_LOGW(TAG, "Socket unable to set nonblocking mode: errno %d", err);
-    this->mark_failed();
-    return;
-  }
-
-  struct sockaddr_storage server;
-
-  socklen_t sl = socket::set_sockaddr_any((struct sockaddr *) &server, sizeof(server), this->port_);
-  if (sl == 0) {
-    ESP_LOGW(TAG, "Socket unable to set sockaddr: errno %d", errno);
-    this->mark_failed();
-    return;
-  }
-
-  err = server_->bind((struct sockaddr *) &server, sizeof(server));
-  if (err != 0) {
-    ESP_LOGW(TAG, "Socket unable to bind: errno %d", errno);
-    this->mark_failed();
-    return;
-  }
-
-  err = server_->listen(4);
-  if (err != 0) {
-    ESP_LOGW(TAG, "Socket unable to listen: errno %d", errno);
-    this->mark_failed();
-    return;
-  }
-
-  this->dump_config();
-}
+void OTAComponent::setup() { this->dump_config(); }
 
 void OTAComponent::dump_config() {
   ESP_LOGCONFIG(TAG, "Over-The-Air Updates:");
-  ESP_LOGCONFIG(TAG, "  Address: %s:%u", network::get_use_address().c_str(), this->port_);
 #ifdef USE_OTA_PASSWORD
   if (!this->password_.empty()) {
     ESP_LOGCONFIG(TAG, "  Using Password.");
@@ -105,14 +59,21 @@ void OTAComponent::dump_config() {
 }
 
 void OTAComponent::loop() {
-  this->handle_();
-
   if (this->has_safe_mode_ && (millis() - this->safe_mode_start_time_) > this->safe_mode_enable_time_) {
     this->has_safe_mode_ = false;
     // successful boot, reset counter
     ESP_LOGI(TAG, "Boot seems successful, resetting boot loop counter.");
     this->clean_rtc();
   }
+}
+
+void OTAComponent::do_OTA_session(OTAFrontend *frontend) {
+  if (this->activeFrontend_ != nullptr) {
+  } else {
+    activeFrontend_ = frontend;
+  }
+
+  this->handle_();
 }
 
 static const uint8_t FEATURE_SUPPORTS_COMPRESSION = 0x01;
@@ -130,22 +91,6 @@ void OTAComponent::handle_() {
   size_t features_reply_length;
   OTAPartitionType bin_type;
 
-  if (client_ == nullptr) {
-    struct sockaddr_storage source_addr;
-    socklen_t addr_len = sizeof(source_addr);
-    client_ = server_->accept((struct sockaddr *) &source_addr, &addr_len);
-  }
-  if (client_ == nullptr)
-    return;
-
-  int enable = 1;
-  int err = client_->setsockopt(IPPROTO_TCP, TCP_NODELAY, &enable, sizeof(int));
-  if (err != 0) {
-    ESP_LOGW(TAG, "Socket could not enable tcp nodelay, errno: %d", errno);
-    return;
-  }
-
-  ESP_LOGD(TAG, "Starting OTA Update from %s...", this->client_->getpeername().c_str());
   this->status_set_warning();
 #ifdef USE_OTA_STATE_CALLBACK
   this->state_callback_.call(OTA_STARTED, 0.0f, 0);
@@ -295,16 +240,16 @@ void OTAComponent::handle_() {
         case OTA_COMMAND_REBOOT:
           buf[0] = OTA_RESPONSE_OK;
           this->writeall_(buf, 1);
-          this->client_->close();
-          this->client_ = nullptr;
+          this->activeFrontend_->closeSession();
+          this->activeFrontend_ = nullptr;
           delay(100);  // NOLINT
           App.safe_reboot();
           return;  // Will never be reached
         case OTA_COMMAND_END:
           ESP_LOGI(TAG, "OTA session finished!");
           // close connection
-          this->client_->close();
-          this->client_ = nullptr;
+          this->activeFrontend_->closeSession();
+          this->activeFrontend_ = nullptr;
           return;
         case OTA_COMMAND_READ:
           error_code = this->get_partition_info_(buf, bin_type, ota_size);
@@ -341,8 +286,8 @@ void OTAComponent::handle_() {
     this->readall_(buf, 1);
 
     // close connection and reboot
-    this->client_->close();
-    this->client_ = nullptr;
+    this->activeFrontend_->closeSession();
+    this->activeFrontend_ = nullptr;
     delay(100);  // NOLINT
     App.safe_reboot();
     return;  // Will never be reached
@@ -351,8 +296,6 @@ void OTAComponent::handle_() {
 error:
   buf[0] = static_cast<uint8_t>(error_code);
   this->writeall_(buf, 1);
-  this->client_->close();
-  this->client_ = nullptr;
 
   this->status_momentary_error("onerror", 5000);
 #ifdef USE_OTA_STATE_CALLBACK
@@ -370,7 +313,7 @@ bool OTAComponent::readall_(uint8_t *buf, size_t len) {
       return false;
     }
 
-    ssize_t read = this->client_->read(buf + at, len - at);
+    ssize_t read = this->activeFrontend_->read(buf + at, len - at);
     if (read == -1) {
       if (errno == EAGAIN || errno == EWOULDBLOCK) {
         App.feed_wdt();
@@ -401,7 +344,7 @@ bool OTAComponent::writeall_(const uint8_t *buf, size_t len) {
       return false;
     }
 
-    ssize_t written = this->client_->write(buf + at, len - at);
+    ssize_t written = this->activeFrontend_->write(buf + at, len - at);
     if (written == -1) {
       if (errno == EAGAIN || errno == EWOULDBLOCK) {
         App.feed_wdt();
@@ -488,7 +431,7 @@ OTAResponseTypes OTAComponent::write_flash_(uint8_t *buf, std::unique_ptr<OTABac
   while (total < ota_size) {
     // TODO: timeout check
     size_t requested = std::min(sizeof(buf), ota_size - total);
-    ssize_t read = this->client_->read(buf, requested);
+    ssize_t read = this->activeFrontend_->read(buf, requested);
     if (read == -1) {
       if (errno == EAGAIN || errno == EWOULDBLOCK) {
         App.feed_wdt();
@@ -634,8 +577,6 @@ error:
 }
 
 float OTAComponent::get_setup_priority() const { return setup_priority::AFTER_WIFI; }
-uint16_t OTAComponent::get_port() const { return this->port_; }
-void OTAComponent::set_port(uint16_t port) { this->port_ = port; }
 
 void OTAComponent::set_safe_mode_pending(const bool &pending) {
   if (!this->has_safe_mode_)

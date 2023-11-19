@@ -1,11 +1,12 @@
 #pragma once
 
-#include "esphome/components/socket/socket.h"
+#include "esphome/core/defines.h"
 #include "esphome/core/component.h"
 #include "esphome/core/preferences.h"
 #include "esphome/core/helpers.h"
 #include "esphome/core/defines.h"
 #include "ota_backend.h"
+#include "ota_frontend.h"
 
 namespace esphome {
 namespace ota {
@@ -38,9 +39,6 @@ class OTAComponent : public Component {
   void set_auth_password(const std::string &password) { password_ = password; }
 #endif  // USE_OTA_PASSWORD
 
-  /// Manually set the port OTA should listen on.
-  void set_port(uint16_t port);
-
   bool should_enter_safe_mode(uint8_t num_attempts, uint32_t enable_time);
 
   /// Set to true if the next startup will enter safe mode
@@ -51,14 +49,16 @@ class OTAComponent : public Component {
   void add_on_state_callback(std::function<void(OTAState, float, uint8_t)> &&callback);
 #endif
 
+  // Starts an OTA session using passed frontend to send/receive bytes
+  // Only one session can be done at the same time
+  void do_OTA_session(OTAFrontend *frontend);
+
   // ========== INTERNAL METHODS ==========
   // (In most use cases you won't need these)
   void setup() override;
   void dump_config() override;
   float get_setup_priority() const override;
   void loop() override;
-
-  uint16_t get_port() const;
 
   void clean_rtc();
 
@@ -81,10 +81,7 @@ class OTAComponent : public Component {
   std::string password_;
 #endif  // USE_OTA_PASSWORD
 
-  uint16_t port_;
-
-  std::unique_ptr<socket::Socket> server_;
-  std::unique_ptr<socket::Socket> client_;
+  OTAFrontend *activeFrontend_{nullptr};
 
   bool has_safe_mode_{false};              ///< stores whether safe mode can be enabled.
   uint32_t safe_mode_start_time_;          ///< stores when safe mode was enabled.

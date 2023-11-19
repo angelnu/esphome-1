@@ -321,7 +321,7 @@ def upload_program(config, args, host):
     from esphome import espota2
 
     ota_conf = config[CONF_OTA]
-    remote_port = ota_conf[CONF_PORT]
+    remote_port = config["ota_socket"][CONF_PORT]
     password = ota_conf.get(CONF_PASSWORD, "")
 
     if (
@@ -374,7 +374,7 @@ def download_program(config, args):
 
     ota_conf = config[CONF_OTA]
     host = CORE.address
-    remote_port = ota_conf[CONF_PORT]
+    remote_port = config["ota_socket"][CONF_PORT]
     password = ota_conf.get(CONF_PASSWORD, "")
 
     bin_type = espota2.OTAPartitionType
@@ -406,7 +406,7 @@ def upload_factory_ota(config, args):
 
     ota_conf = config[CONF_OTA]
     host = CORE.address
-    remote_port = ota_conf[CONF_PORT]
+    remote_port = config["ota_socket"][CONF_PORT]
     password = ota_conf.get(CONF_PASSWORD, "")
 
     if (
