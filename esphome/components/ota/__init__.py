@@ -15,7 +15,7 @@ from esphome.const import (
 from esphome.core import CORE, coroutine_with_priority
 
 CODEOWNERS = ["@esphome/core"]
-AUTO_LOAD = ["md5"]
+AUTO_LOAD = ["md5", "ota_socket"]
 
 CONF_UNPROTECTED_WRITES = "unprotected_writes"
 CONF_ON_STATE_CHANGE = "on_state_change"

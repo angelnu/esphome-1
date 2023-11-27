@@ -93,12 +93,12 @@ void OTAFrontendSocket::handle_() {
   }
 
   ESP_LOGD(TAG, "Starting OTA Update from %s...", this->client_->getpeername().c_str());
-  ota::global_ota_component->do_OTA_session(this);
+  ota::global_ota_component->do_ota_session(this);
 }
 
 ssize_t OTAFrontendSocket::read(uint8_t *buf, size_t len) { return this->client_->read(buf, len); }
 ssize_t OTAFrontendSocket::write(const uint8_t *buf, size_t len) { return this->client_->write(buf, len); }
-void OTAFrontendSocket::closeSession() {
+void OTAFrontendSocket::close_session() {
   this->client_->close();
   this->client_ = nullptr;
 }

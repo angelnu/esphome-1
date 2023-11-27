@@ -17,7 +17,7 @@ class OTAFrontendSocket : public Component, public ota::OTAFrontend {
 
   ssize_t read(uint8_t *buf, size_t len) override;
   ssize_t write(const uint8_t *buf, size_t len) override;
-  void closeSession() override;
+  void close_session() ;
 
   // ========== INTERNAL METHODS ==========
   // (In most use cases you won't need these)
